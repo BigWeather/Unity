@@ -39,30 +39,30 @@ namespace GamesLibrary
 
 	public class Color
 	{
-		public static Color Black { get { return Color.fromUnity(UnityEngine.Color.black); } }
-		public static Color Beige { get { return Color.fromUnity(new UnityEngine.Color(128, 128, 128)); } } // TODO: Get real rgb
-		public static Color CornflowerBlue { get { return Color.fromUnity(UnityEngine.Color.blue); } } // TODO: Get real rgb
-		public static Color DarkGray { get { return Color.fromUnity(UnityEngine.Color.gray); } } // TODO: Get real rgb
-		public static Color ForestGreen { get { return Color.fromUnity(UnityEngine.Color.green); } } // TODO: Get real rgb
-		public static Color Gray { get { return Color.fromUnity(UnityEngine.Color.gray); } }
-		public static Color Green { get { return Color.fromUnity(UnityEngine.Color.green); } }
-		public static Color LightBlue { get { return Color.fromUnity(UnityEngine.Color.blue); } } // TODO: Get real rgb
-		public static Color Red { get { return Color.fromUnity(UnityEngine.Color.red); } }
-		public static Color Tan { get { return Color.fromUnity(new UnityEngine.Color(128, 128, 128)); } } // TODO: Get real rgb
-		public static Color White { get { return Color.fromUnity(UnityEngine.Color.white); } }
-		public static Color Yellow { get { return Color.fromUnity(UnityEngine.Color.yellow); } }
-		public static Color YellowGreen { get { return Color.fromUnity(UnityEngine.Color.yellow); } } // TODO: Get real rgb
+		public static Color Black { get { return new Color(0, 0, 0, 255); } }
+		public static Color Beige { get { return new Color(245,245, 220, 255); } }
+		public static Color CornflowerBlue { get { return new Color(100, 149, 237, 255); } }
+		public static Color DarkGray { get { return new Color(169, 169, 169, 255); } }
+		public static Color ForestGreen { get { return new Color(34, 139, 34, 255); } }
+		public static Color Gray { get { return new Color(128, 128, 128, 255); } }
+		public static Color Green { get { return new Color(0, 128, 0, 255); } }
+		public static Color LightBlue { get { return new Color(173, 216, 230, 255); } }
+		public static Color Red { get { return new Color(255, 0, 0, 255); } }
+		public static Color Tan { get { return new Color(210, 180, 140, 255); } }
+		public static Color White { get { return new Color(255, 255, 255, 255); } }
+		public static Color Yellow { get { return new Color(255, 255, 0, 255); } }
+		public static Color YellowGreen { get { return new Color(154, 205, 50, 255); } }
 
-		public float r { get; private set; }
-		public float g { get; private set; }
-		public float b { get; private set; }
-		public float a { get; private set; }
+		public byte r { get; private set; }
+		public byte g { get; private set; }
+		public byte b { get; private set; }
+		public byte a { get; private set; }
 
-		public Color(Vector3 vector) : this(vector.X, vector.Y, vector.Z) { }
+		public Color(Vector3 vector) : this((byte)(vector.X * 255), (byte)(vector.Y * 255), (byte)(vector.Z * 255)) { }
 
-		public Color(float r, float g, float b) : this(r, g, b, 0) { }
+		public Color(byte r, byte g, byte b) : this(r, g, b, 255) { }
 
-		public Color(float r, float g, float b, float a)
+		public Color(byte r, byte g, byte b, byte a)
 		{
 			this.r = r;
 			this.g = g;
@@ -72,12 +72,17 @@ namespace GamesLibrary
 
 		public Vector3 ToVector3()
 		{
-			return new Vector3(r, g, b);
+			return new Vector3((float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f);
 		}
 
 		private static Color fromUnity(UnityEngine.Color colorUnity)
 		{
-			return new Color(colorUnity.r, colorUnity.g, colorUnity.b, colorUnity.a);
+			return new Color((byte)(colorUnity.r * 255), (byte)(colorUnity.g * 255), (byte)(colorUnity.b * 255), (byte)(colorUnity.a * 255));
+		}
+
+		internal UnityEngine.Color toUnity()
+		{
+			return new UnityEngine.Color((float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f, (float)a / 255.0f);
 		}
 	}
 
@@ -655,24 +660,29 @@ namespace GamesLibrary
 		
 		public void Draw(Texture2D texture, Rectangle destinationRectangle, Rectangle sourceRectangle, Color color)
 		{
-			// TODO: Implement color
+			UnityEngine.Color colorSaved = GUI.color;
+
+			GUI.color = color.toUnity();
 			Rect sourceRect = getSourceRect(texture, sourceRectangle);
 			GUI.DrawTextureWithTexCoords(new Rect(destinationRectangle.Left, destinationRectangle.Top, destinationRectangle.Width, destinationRectangle.Height),
 			                             texture,
 			                             sourceRect);
+
+			GUI.color = colorSaved;
 		}
 
 		public void Draw(Texture2D texture, Rectangle destinationRectangle, Rectangle sourceRectangle, Color color, float rotation, Vector2 origin, SpriteEffects effects, float layerDepth)
 		{
+			UnityEngine.Matrix4x4 matrixSaved = GUI.matrix;
+			UnityEngine.Color colorSaved = GUI.color;
+			
 			Vector3 originOffsetFromSourceRectangleW = new Vector3(origin.X * ((float)destinationRectangle.Width / (float)sourceRectangle.Width),
 			                                                       origin.Y * ((float)destinationRectangle.Height / (float)sourceRectangle.Height), 
 			                                                       0.0f);
 			Vector3 originW = new Vector3(destinationRectangle.Left + originOffsetFromSourceRectangleW.X, 
 			                              destinationRectangle.Top + originOffsetFromSourceRectangleW.Y, 
 			                              0.0f);
-
-			UnityEngine.Matrix4x4 matrixSaved = GUI.matrix;
-
+			
 			Matrix mx = Matrix.Identity;
 			mx *= Matrix.CreateTranslation(-originW);
 			mx *= Matrix.CreateRotationZ(rotation);
@@ -680,12 +690,17 @@ namespace GamesLibrary
 			mx *= Matrix.CreateTranslation(-originOffsetFromSourceRectangleW);
 
 			GUI.matrix *= mx.toUnity();
+			GUI.color = color.toUnity();
+
+			if (color.r != 255)
+				GUI.color = color.toUnity();
 
 			GUI.DrawTextureWithTexCoords(new Rect(destinationRectangle.Left, destinationRectangle.Top, destinationRectangle.Width, destinationRectangle.Height),
 			                             texture,
 			                             getSourceRect(texture, sourceRectangle));
 
 			GUI.matrix = matrixSaved;
+			GUI.color = colorSaved;
 		}
 
 		public void DrawString(SpriteFont spriteFont, string text, Vector2 position, Color color)
