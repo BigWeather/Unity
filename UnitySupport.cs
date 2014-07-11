@@ -204,6 +204,12 @@ namespace GamesLibrary
 			IsRunningSlowly = false; // TODO: Implement
 			TotalGameTime = TimeSpan.FromSeconds(Time.time);
 		}
+
+		public GameTime(GameTime priorGameTime) : this()
+		{
+			if (priorGameTime != null)
+				ElapsedGameTime = TimeSpan.FromSeconds(Time.time - priorGameTime.TotalGameTime.TotalSeconds);
+		}
 	}
 
 	public class GraphicsDevice
@@ -691,9 +697,6 @@ namespace GamesLibrary
 
 			GUI.matrix *= mx.toUnity();
 			GUI.color = color.toUnity();
-
-			if (color.r != 255)
-				GUI.color = color.toUnity();
 
 			GUI.DrawTextureWithTexCoords(new Rect(destinationRectangle.Left, destinationRectangle.Top, destinationRectangle.Width, destinationRectangle.Height),
 			                             texture,
