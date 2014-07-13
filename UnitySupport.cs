@@ -1,3 +1,6 @@
+// TODO: Figure out how to get this to work without this define.
+#define DRAWCLIP 
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,6 +27,19 @@ namespace GamesLibrary
 		{
 			Texture2D tx2d = Resources.Load<Texture2D>(@assetName);
 			TextureManager.Instance.setTexture(identifier, tx2d);
+		}
+
+		public static void loadFont(this BaseGame baseGame, string identifier, string assetName)
+		{
+			// TODO: ICK!
+			if (assetName.CompareTo("Roboto") == 0)
+				assetName += "-Regular";
+
+			Font font = Resources.Load<Font>(@assetName);
+			if (font == null)
+				return;
+
+			FontManager.Instance.setFont(identifier, new SpriteFont(font));
 		}
 	}
 
@@ -214,7 +230,52 @@ namespace GamesLibrary
 
 	public class GraphicsDevice
 	{
-		public Rectangle ScissorRectangle { get; set; } // TODO: Implement
+		public Rectangle ScissorRectangle 
+		{ 
+			get
+			{
+				return _ScissorRectangle;
+			}
+			set
+			{
+				Rect r = new Rect(value.Left, value.Top, value.Width, value.Height);
+
+#if false
+				if ( r.x < 0 )
+				{
+					r.width += r.x;
+					r.x = 0;
+				}
+				
+				if ( r.y < 0 )
+				{
+					r.height += r.y;
+					r.y = 0;
+				}
+				
+				r.width = Mathf.Min( 1 - r.x, r.width );
+				r.height = Mathf.Min( 1 - r.y, r.height );
+
+				Camera cam = Camera.main;
+				Camera[] cameras = Camera.allCameras;
+
+				cam.rect = new Rect (0,0,1,1);
+				cam.ResetProjectionMatrix ();
+				Matrix4x4 m = cam.projectionMatrix;
+				cam.rect = r;
+				Matrix4x4 m1 = Matrix4x4.TRS( new UnityEngine.Vector3( r.x, r.y, 0 ), Quaternion.identity, new UnityEngine.Vector3( r.width, r.height, 1 ) );
+				Matrix4x4 m2 = Matrix4x4.TRS (new UnityEngine.Vector3 ( ( 1/r.width - 1), ( 1/r.height - 1 ), 0), Quaternion.identity, new UnityEngine.Vector3 (1/r.width, 1/r.height, 1));
+				Matrix4x4 m3 = Matrix4x4.TRS( new UnityEngine.Vector3( -r.x * 2 / r.width, -r.y * 2 / r.height, 0 ), Quaternion.identity, UnityEngine.Vector3.one );
+				cam.projectionMatrix = m3 * m2 * m; 
+#endif
+
+				_ScissorRectangle = new Rectangle((int)r.x, (int)r.y, (int)r.width, (int)r.height);
+				this.unityScissorRectangle = r;
+			}
+		} // TODO: Implement
+		private Rectangle _ScissorRectangle;
+
+		public Rect unityScissorRectangle { get; private set; }
 
 		public Viewport Viewport 
 		{ 
@@ -629,23 +690,59 @@ namespace GamesLibrary
 		private Matrix4x4 _savedMatrix;
 		private bool _matrixIsSaved = false;
 
+		private RasterizerState _rasterizerState = null;
+
 		public SpriteBatch(GraphicsDevice graphicsDevice)
 		{
 			this.GraphicsDevice = graphicsDevice;
 		}
 
+		private int _spriteBatchBeginCt = 0;
+
 		public void Begin()
 		{
+			_spriteBatchBeginCt++;
+
 			_matrixIsSaved = false;
+
+			_rasterizerState = null;
 		}
 
 		public void Begin(SpriteSortMode spriteSortMode, object blendState, object samplerState, object depthStencilState, RasterizerState rasterizerState, object effect, Matrix matrix)
 		{
+			_spriteBatchBeginCt++;
+
 			// TODO: Implement for other parameters
 			_savedMatrix = GUI.matrix;
 			_matrixIsSaved = true;
 
 			GUI.matrix = matrix.toUnity();
+
+			_rasterizerState = rasterizerState;
+
+#if !DRAWCLIP
+			if ((_rasterizerState != null) && _rasterizerState.ScissorTestEnable)
+				//GUI.BeginGroup(this.GraphicsDevice.unityScissorRectangle);
+				GUI.BeginGroup(new Rect(0, 0, this.GraphicsDevice.ScissorRectangle.Width, this.GraphicsDevice.ScissorRectangle.Height));
+#endif
+		}
+		
+		public void End()
+		{
+			// TODO: Implement
+#if !DRAWCLIP
+			if ((_rasterizerState != null) && _rasterizerState.ScissorTestEnable)
+				GUI.EndGroup();
+			_rasterizerState = null;
+#endif
+			
+			if (_matrixIsSaved)
+				GUI.matrix = _savedMatrix;
+
+			_spriteBatchBeginCt--;
+
+			if (_spriteBatchBeginCt != 0)
+				_rasterizerState = null;
 		}
 
 		private Rect getSourceRect(Texture2D texture, Rectangle sourceRectangle)
@@ -666,6 +763,12 @@ namespace GamesLibrary
 		
 		public void Draw(Texture2D texture, Rectangle destinationRectangle, Rectangle sourceRectangle, Color color)
 		{
+#if DRAWCLIP
+			if ((_rasterizerState != null) && _rasterizerState.ScissorTestEnable)
+				//GUI.BeginGroup(this.GraphicsDevice.unityScissorRectangle);
+				GUI.BeginGroup(new Rect(0, 0, this.GraphicsDevice.ScissorRectangle.Width, this.GraphicsDevice.ScissorRectangle.Height));
+#endif
+
 			UnityEngine.Color colorSaved = GUI.color;
 
 			GUI.color = color.toUnity();
@@ -675,6 +778,11 @@ namespace GamesLibrary
 			                             sourceRect);
 
 			GUI.color = colorSaved;
+
+#if DRAWCLIP
+			if ((_rasterizerState != null) && _rasterizerState.ScissorTestEnable)
+				GUI.EndGroup();
+#endif
 		}
 
 		public void Draw(Texture2D texture, Rectangle destinationRectangle, Rectangle sourceRectangle, Color color, float rotation, Vector2 origin, SpriteEffects effects, float layerDepth)
@@ -708,16 +816,16 @@ namespace GamesLibrary
 
 		public void DrawString(SpriteFont spriteFont, string text, Vector2 position, Color color)
 		{
-			// TODO: Implement correctly, including width, height, and color
-			Vector2 textSize = spriteFont.MeasureString(text);
-			GUI.Label(new Rect(position.X, position.Y, textSize.X + 10, textSize.Y + 10), text);
-		}
+			GUIStyle guiStyle = spriteFont.guiStyle;
 
-		public void End()
-		{
-			// TODO: Implement
-			if (_matrixIsSaved)
-				GUI.matrix = _savedMatrix;
+			UnityEngine.Color colorSaved = guiStyle.normal.textColor;
+			
+			guiStyle.normal.textColor = color.toUnity();
+
+			Vector2 textSize = spriteFont.MeasureString(text);
+			GUI.Label(new Rect(position.X, position.Y, textSize.X, textSize.Y), text, guiStyle);
+
+			guiStyle.normal.textColor = colorSaved;
 		}
 	}
 
@@ -728,12 +836,18 @@ namespace GamesLibrary
 	
 	public class SpriteFont
 	{
-		private static GUIStyle _guiStyle = new GUIStyle();
+		public GUIStyle guiStyle { get; private set; }
+
+		public SpriteFont(Font font)
+		{
+			guiStyle = new GUIStyle();
+			guiStyle.font = font;
+		}
 
 		public Vector2 MeasureString(string text)
 		{
 			// TODO: Implement correctly
-			UnityEngine.Vector2 v2TextSize = _guiStyle.CalcSize(new GUIContent(text));
+			UnityEngine.Vector2 v2TextSize = guiStyle.CalcSize(new GUIContent(text));
 			return new Vector2(v2TextSize.x, v2TextSize.y);
 		}
 	}
