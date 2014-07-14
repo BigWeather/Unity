@@ -638,7 +638,7 @@ namespace GamesLibrary
 		public bool ScissorTestEnable { get; set; } // TODO: Implement
 	}
 
-	public class Rectangle 
+	public struct Rectangle 
 	{ 
 		public int X { get { return (int)_rectUnity.x; } }
 		public int Y { get { return (int)_rectUnity.y; } }
@@ -680,6 +680,26 @@ namespace GamesLibrary
 		{
 			_rectUnity.x += offsetX;
 			_rectUnity.y += offsetY;
+		}
+
+		public override bool Equals(object obj) 
+		{
+			return ((obj is Rectangle) && (this == (Rectangle)obj));
+		}
+
+		public override int GetHashCode() 
+		{
+			return X.GetHashCode() ^ Y.GetHashCode() ^ Width.GetHashCode() ^ Height.GetHashCode();
+		}
+
+		public static bool operator ==(Rectangle r1, Rectangle r2) 
+		{
+			return ((r1.X == r2.X) && (r1.Y == r2.Y) && (r1.Width == r2.Width) && (r1.Height == r2.Height));
+		}
+
+		public static bool operator !=(Rectangle r1, Rectangle r2) 
+		{
+			return !(r1 == r2);
 		}
 	}
 	
